@@ -3,4 +3,6 @@ This game is a card game with a console based interface and coded in c++. this g
 
 #Screenshot
 ![Screenshot](ss1.png)
-![Screenshot](ss1.png)
+![Screenshot](ss2.png)
+![Screenshot](ss3.png)
+![Screenshot](ss4.png)
