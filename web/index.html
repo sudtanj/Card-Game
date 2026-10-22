@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>U-Card — Play in your browser</title>
+<meta name="description" content="Play U-Card, a C++ console card game, directly in your browser. The original source is compiled to WebAssembly.">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<style>
+	:root {
+		--felt: #0b3d22;
+		--felt-dark: #052414;
+		--console-bg: #0c0c0c;
+		--console-fg: #cccccc;
+		--titlebar: #ffffff;
+		--accent: #f5c542;
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		min-height: 100vh;
+		font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+		color: #e8f5ec;
+		background: radial-gradient(ellipse at top, #146b3a 0%, var(--felt) 45%, var(--felt-dark) 100%);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 24px 12px 40px;
+	}
+	header { text-align: center; margin-bottom: 20px; }
+	header img { width: 96px; height: 96px; filter: drop-shadow(0 6px 12px rgba(0,0,0,.4)); }
+	header h1 { margin: 8px 0 4px; font-size: 2rem; letter-spacing: .02em; }
+	header p { margin: 0; opacity: .85; }
+	header a { color: var(--accent); }
+
+	.window {
+		width: min(100%, 980px);
+		border: 1px solid #1f6feb;
+		box-shadow: 0 20px 50px rgba(0,0,0,.5);
+		background: var(--console-bg);
+	}
+	.titlebar {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		height: 32px;
+		padding-left: 8px;
+		background: var(--titlebar);
+		color: #000;
+		font-size: 12px;
+		user-select: none;
+	}
+	.titlebar img { width: 16px; height: 16px; }
+	.titlebar .title { flex: 1; }
+	.titlebar .controls { display: flex; height: 100%; }
+	.titlebar .controls span {
+		width: 46px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 14px;
+	}
+	.titlebar .controls span:last-child:hover { background: #e81123; color: #fff; }
+
+	.console {
+		height: 520px;
+		overflow: auto;
+		padding: 6px 4px;
+		outline: none;
+		cursor: text;
+	}
+	.console:focus-visible { box-shadow: inset 0 0 0 1px #3a96dd; }
+	#screen {
+		margin: 0;
+		color: var(--console-fg);
+		font-family: Consolas, "Cascadia Mono", "Lucida Console", "DejaVu Sans Mono", monospace;
+		font-size: 15px;
+		line-height: 1.15;
+		white-space: pre;
+	}
+	#screen .red { color: #e74856; }
+	#screen .black { color: #f2f2f2; }
+	#screen .cursor {
+		display: inline-block;
+		width: .6em;
+		height: 2px;
+		background: var(--console-fg);
+		vertical-align: baseline;
+		animation: blink 1s steps(1) infinite;
+	}
+	@keyframes blink { 50% { opacity: 0; } }
+
+	.keys {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		justify-content: center;
+		margin-top: 16px;
+	}
+	.keys button {
+		min-width: 44px;
+		height: 44px;
+		padding: 0 12px;
+		border: 1px solid rgba(255,255,255,.25);
+		border-bottom-width: 3px;
+		border-radius: 8px;
+		background: rgba(0,0,0,.35);
+		color: #fff;
+		font: 600 16px Consolas, monospace;
+		cursor: pointer;
+	}
+	.keys button:active { transform: translateY(2px); border-bottom-width: 1px; }
+	.keys button small { display: block; font: 400 10px "Segoe UI", sans-serif; opacity: .7; }
+
+	.help {
+		width: min(100%, 980px);
+		margin-top: 20px;
+		font-size: 14px;
+		line-height: 1.6;
+		opacity: .9;
+	}
+	.help kbd {
+		padding: 1px 6px;
+		border: 1px solid rgba(255,255,255,.35);
+		border-radius: 4px;
+		font-family: Consolas, monospace;
+	}
+	.status { text-align: center; margin-top: 12px; min-height: 1.5em; }
+	.status button {
+		margin-left: 8px;
+		padding: 6px 14px;
+		border: 0;
+		border-radius: 6px;
+		background: var(--accent);
+		color: #000;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	footer { margin-top: 28px; font-size: 13px; opacity: .7; }
+	footer a { color: inherit; }
+</style>
+</head>
+<body>
+<header>
+	<img src="logo.svg" alt="U-Card logo">
+	<h1>U-Card</h1>
+	<p>A C++ console card game, running in your browser. No install needed.
+		<a href="https://github.com/sudtanj/Card-Game">View source on GitHub</a></p>
+</header>
+
+<div class="window" role="application" aria-label="U-Card console">
+	<div class="titlebar">
+		<img src="logo.svg" alt="">
+		<span class="title">U Card</span>
+		<span class="controls" aria-hidden="true"><span>&#x2013;</span><span>&#x2610;</span><span>&#x2715;</span></span>
+	</div>
+	<div class="console" id="console" tabindex="0">
+		<pre id="screen">Loading U-Card…</pre>
+	</div>
+</div>
+
+<div class="status" id="status" aria-live="polite"></div>
+
+<div class="keys" aria-label="On-screen keyboard">
+	<button data-key="1">1<small>player 1</small></button>
+	<button data-key="2">2<small>player 2</small></button>
+	<button data-key="d">d<small>deal</small></button>
+	<button data-key="c">c<small>compare</small></button>
+	<button data-key="r">r<small>result</small></button>
+	<button data-key="y">y<small>again</small></button>
+	<button data-key="n">n<small>quit</small></button>
+</div>
+
+<section class="help">
+	<strong>How to play:</strong> type on your keyboard (or tap the keys above), just like in the
+	Windows console. Pick a player with <kbd>1</kbd> or <kbd>2</kbd>, deal with <kbd>d</kbd>, fold your
+	lowest-ranked card with <kbd>c</kbd>, then see the score with <kbd>r</kbd>.
+	<br>
+	<strong>Note:</strong> this is the original <code>main.cpp</code> compiled to WebAssembly, including its quirks.
+	For example, the player menu reads the keyboard twice, so you need to press <kbd>2</kbd> twice to pick Player 2.
+</section>
+
+<footer>Compiled from <code>cardgame/Card GAme/main.cpp</code> with Emscripten.</footer>
+
+<script>
+(function () {
+	var screenEl = document.getElementById('screen');
+	var consoleEl = document.getElementById('console');
+	var statusEl = document.getElementById('status');
+
+	// The game prints Windows code page bytes 3-6 for the card suits.
+	var SUIT_CHARS = { 3: '♥', 4: '♦', 5: '♣', 6: '♠' };
+	var MAX_QUEUED_KEYS = 16;
+
+	var buffer = '';
+	var renderQueued = false;
+	var pendingKeys = [];
+	var keyWaiter = null;
+
+	function escapeHtml(text) {
+		return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	}
+
+	function render() {
+		renderQueued = false;
+		screenEl.innerHTML = escapeHtml(buffer)
+			.replace(/[♥♦]/g, '<span class="red">$&</span>')
+			.replace(/[♣♠]/g, '<span class="black">$&</span>') + '<span class="cursor"></span>';
+		consoleEl.scrollTop = consoleEl.scrollHeight;
+	}
+
+	function scheduleRender() {
+		if (!renderQueued) {
+			renderQueued = true;
+			requestAnimationFrame(render);
+		}
+	}
+
+	function writeByte(code) {
+		if (code === null || code === 13) return;
+		buffer += SUIT_CHARS[code] || String.fromCharCode(code);
+		scheduleRender();
+	}
+
+	function pressKey(ch) {
+		var code = ch.charCodeAt(0);
+		if (keyWaiter) {
+			var resolve = keyWaiter;
+			keyWaiter = null;
+			resolve(code);
+		} else if (pendingKeys.length < MAX_QUEUED_KEYS) {
+			pendingKeys.push(code);
+		}
+	}
+
+	function showExit(message) {
+		statusEl.textContent = message;
+		var button = document.createElement('button');
+		button.textContent = 'Run again';
+		button.addEventListener('click', function () { location.reload(); });
+		statusEl.appendChild(button);
+	}
+
+	document.addEventListener('keydown', function (e) {
+		if (e.ctrlKey || e.metaKey || e.altKey) return;
+		if (e.key.length === 1) {
+			e.preventDefault();
+			pressKey(e.key);
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			pressKey('\r');
+		}
+	});
+
+	document.querySelectorAll('.keys button').forEach(function (button) {
+		button.addEventListener('click', function () {
+			pressKey(button.dataset.key);
+			consoleEl.focus();
+		});
+	});
+
+	window.Module = {
+		stdout: writeByte,
+		stderr: writeByte,
+		ucardClear: function () {
+			buffer = '';
+			scheduleRender();
+		},
+		ucardWaitKey: function () {
+			if (pendingKeys.length) return Promise.resolve(pendingKeys.shift());
+			return new Promise(function (resolve) { keyWaiter = resolve; });
+		},
+		onRuntimeInitialized: function () {
+			buffer = '';
+			scheduleRender();
+			consoleEl.focus();
+		},
+		onExit: function () {
+			showExit('U-Card has exited.');
+		},
+		onAbort: function () {
+			showExit('U-Card crashed.');
+		}
+	};
+})();
+</script>
+<script src="ucard.js"></script>
+</body>
+</html>
